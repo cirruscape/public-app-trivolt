@@ -64,6 +64,10 @@ _Avoid_: Ended, complete, over, closed
 A short code shown by the Host that Players enter to join a specific Game during its Lobby.
 _Avoid_: PIN, room code, game ID
 
+**Join Link**:
+A link that opens the join screen with a Game's Join Code already filled in. During the Lobby the Host shows it as text and as a QR code.
+_Avoid_: Invite link, share URL
+
 **Answer**:
 The single Option a Player submits for a Question; it cannot be changed once submitted.
 _Avoid_: Response, guess, vote
