@@ -77,11 +77,11 @@ aws cloudformation deploy --profile quizdash --region ap-southeast-2 \
   --stack-name quizapp-dev-bootstrap \
   --template-file infra/bootstrap/github-oidc.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides Env=dev GitHubRepository=cirruscape/quizdash-app \
-    GitHubSubjectPrefix=repo:cirruscape@235645298/quizdash-app@1432826993
+  --parameter-overrides Env=dev GitHubRepository=cirruscape/public-app-trivolt \
+    GitHubSubjectPrefix=repo:cirruscape@235645298/public-app-trivolt@1432826993
 ```
 
-`GitHubSubjectPrefix` must match the start of the OIDC `sub` claim GitHub sends. This repo uses GitHub's immutable subject format, which includes the owner and repo IDs. Look it up with `curl -s https://api.github.com/repos/cirruscape/quizdash-app/actions/oidc/customization/sub` (`sub_claim_prefix`). For a repo using the classic format, leave the parameter out.
+`GitHubSubjectPrefix` must match the start of the OIDC `sub` claim GitHub sends. This repo uses GitHub's immutable subject format, which includes the owner and repo names and IDs. Look it up with `curl -s https://api.github.com/repos/cirruscape/public-app-trivolt/actions/oidc/customization/sub` (`sub_claim_prefix`). For a repo using the classic format, leave the parameter out. Renaming the repo changes the claim, so re-run this bootstrap with the new name or GitHub deploys fail with "Not authorized to perform sts:AssumeRoleWithWebIdentity".
 
 The GitHub OIDC provider exists only once per AWS account. If the account already has one, add `CreateOidcProvider=false ExistingOidcProviderArn=<arn>`.
 
@@ -108,8 +108,8 @@ aws cloudformation deploy --profile quizdash --region ap-southeast-2 \
   --stack-name quizapp-prod-bootstrap \
   --template-file infra/bootstrap/github-oidc.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides Env=prod GitHubRepository=cirruscape/quizdash-app \
-    GitHubSubjectPrefix=repo:cirruscape@235645298/quizdash-app@1432826993 \
+  --parameter-overrides Env=prod GitHubRepository=cirruscape/public-app-trivolt \
+    GitHubSubjectPrefix=repo:cirruscape@235645298/public-app-trivolt@1432826993 \
     CreateOidcProvider=false \
     ExistingOidcProviderArn=arn:aws:iam::587736032611:oidc-provider/token.actions.githubusercontent.com
 ```
