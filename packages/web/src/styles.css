@@ -696,7 +696,7 @@ label {
 /* The Join Link as a QR code: big enough to scan from across a room when projected. */
 .qrcode {
   display: block;
-  width: min(100%, 60vh);
+  width: min(50%, 30vh);
   height: auto;
   margin: 0.75rem auto 0;
   border-radius: 4px;
@@ -730,7 +730,7 @@ label {
   }
 
   .lobby .qrcode {
-    width: min(100%, 60vh, 45vw);
+    width: min(50%, 30vh, 22.5vw);
   }
 
   .lobby__players {
