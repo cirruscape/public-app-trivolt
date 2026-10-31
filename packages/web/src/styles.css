@@ -693,6 +693,57 @@ label {
   overflow-wrap: anywhere;
 }
 
+/* The Join Link as a QR code: big enough to scan from across a room when projected. */
+.qrcode {
+  display: block;
+  width: min(100%, 60vh);
+  height: auto;
+  margin: 0.75rem auto 0;
+  border-radius: 4px;
+}
+
+.joincode__scan {
+  font-weight: 700;
+  margin: 0.5rem 0 0;
+}
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Large screens (e.g. a projector): the Join Code and QR code on the left, Players on the
+   right, so the Host sees both without scrolling. */
+@media (min-width: 62.5rem) {
+  .page--wide {
+    max-width: none;
+    width: min(100%, 120rem);
+    padding-inline: 2rem;
+  }
+
+  .lobby {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .lobby .qrcode {
+    width: min(100%, 60vh, 45vw);
+  }
+
+  .lobby__players {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .lobby__players h2 {
+    margin: 0;
+  }
+}
+
 .players {
   list-style: none;
   padding: 0;

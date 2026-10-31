@@ -2,9 +2,18 @@
 import type { ReactNode } from 'react';
 import type { LeaderboardEntry, Option } from './types.js';
 
-export function Page({ title, children }: { title?: string; children: ReactNode }) {
+export function Page({
+  title,
+  wide = false,
+  children,
+}: {
+  title?: string;
+  /** Use the full width of large screens, e.g. the Lobby shown on a projector. */
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <main className="page">
+    <main className={wide ? 'page page--wide' : 'page'}>
       {title && <h1>{title}</h1>}
       {children}
     </main>

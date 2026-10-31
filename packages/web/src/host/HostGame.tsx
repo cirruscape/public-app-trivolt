@@ -8,6 +8,8 @@ import { useCountdown } from '../sync/use-countdown.js';
 import { useLiveSnapshot } from '../sync/use-live-snapshot.js';
 import { runningDeadline, type HostSnapshot } from '../types.js';
 import { hostToken } from './auth.js';
+import { joinLink } from './join-link.js';
+import { QrCode } from './QrCode.js';
 
 export function HostGame() {
   const { gameId = '' } = useParams();
@@ -72,47 +74,53 @@ export function HostGame() {
     );
   }
 
-  const joinLink = `${window.location.origin}/play?code=${s.joinCode}`;
-
   switch (s.phase) {
-    case 'LOBBY':
+    case 'LOBBY': {
+      const link = joinLink(window.location.origin, s.joinCode);
       return (
-        <Page title="Waiting for players">
-          <div className="joincode">
-            <p className="muted">Join at {window.location.host}/play with code</p>
-            <p className="joincode__code">{s.joinCode}</p>
-            <p className="joincode__link">
-              <a href={joinLink}>{joinLink}</a>
-            </p>
+        <Page title="Waiting for players" wide>
+          <div className="lobby">
+            <div className="joincode">
+              <p className="muted">Join at {window.location.host}/play with code</p>
+              <p className="joincode__code">{s.joinCode}</p>
+              <QrCode value={link} label={`QR code to join with code ${s.joinCode}`} />
+              <p className="joincode__scan">Scan to join</p>
+              <p className="joincode__link">
+                <a href={link}>{link}</a>
+              </p>
+            </div>
+            <div className="lobby__players">
+              <h2>
+                {s.players.length} {s.players.length === 1 ? 'player' : 'players'}
+              </h2>
+              <ul className="players">
+                {s.players.map((p) => (
+                  <li key={p.playerId}>
+                    {p.nickname}
+                    <button
+                      type="button"
+                      className="link link--danger"
+                      onClick={() => void command(`/players/${p.playerId}`, 'DELETE')}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <ErrorNote message={error} />
+              <button
+                type="button"
+                className="button button--primary"
+                disabled={busy || s.players.length === 0}
+                onClick={() => void command('/start')}
+              >
+                Start the game
+              </button>
+            </div>
           </div>
-          <h2>
-            {s.players.length} {s.players.length === 1 ? 'player' : 'players'}
-          </h2>
-          <ul className="players">
-            {s.players.map((p) => (
-              <li key={p.playerId}>
-                {p.nickname}
-                <button
-                  type="button"
-                  className="link link--danger"
-                  onClick={() => void command(`/players/${p.playerId}`, 'DELETE')}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-          <ErrorNote message={error} />
-          <button
-            type="button"
-            className="button button--primary"
-            disabled={busy || s.players.length === 0}
-            onClick={() => void command('/start')}
-          >
-            Start the game
-          </button>
         </Page>
       );
+    }
 
     case 'QUESTION_OPEN': {
       const q = s.question!;
