@@ -9,6 +9,7 @@
     "start": "node dist-bundle/index.mjs"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.9.1",
     "@quizapp/contracts": "workspace:*",
     "@strands-agents/sdk": "^1.22.0",
     "zod": "^4.6.7"

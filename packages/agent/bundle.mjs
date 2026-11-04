@@ -15,9 +15,13 @@ await build({
   sourcemap: true,
   conditions: ['@quizapp/source'],
   // Strands' optional peer dependencies that aren't installed (other model providers, A2A,
-  // telemetry exporters). This agent never loads them. Installed peers that Strands imports
-  // at startup (@modelcontextprotocol/client, @opentelemetry/api) are bundled.
+  // telemetry exporters). This agent never loads them. @modelcontextprotocol/client, which
+  // Strands imports at startup, is bundled.
+  // @opentelemetry/api is not bundled: the image installs it (image/package.json) so the app and
+  // ADOT share one copy. Two copies would each have their own context keys, and ADOT couldn't
+  // see the session.id baggage or Strands' active spans.
   external: [
+    '@opentelemetry/api',
     '@a2a-js/sdk',
     '@ai-sdk/provider',
     '@anthropic-ai/sdk',
