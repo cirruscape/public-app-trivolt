@@ -137,6 +137,14 @@ Resources:
             - RepositoryUri: { 'Fn::ImportValue': !Sub 'quizapp-${Env}-AgentRepositoryUri' }
       EnvironmentVariables:
         MODEL_ID: !FindInMap [Models, !Ref Env, ModelId]
+        # AgentCore Observability: ADOT (loaded by the image's CMD) exports spans over OTLP to
+        # X-Ray's endpoint in this Region, which lands them in the aws/spans log group (needs
+        # CloudWatch Transaction Search, enabled once per account). Traces only: the runtime
+        # already ships stdout to CloudWatch Logs, and AgentCore publishes its own metrics.
+        AGENT_OBSERVABILITY_ENABLED: 'true'
+        OTEL_RESOURCE_ATTRIBUTES: !Sub service.name=quizapp_${Env}_generator,deployment.environment=${Env}
+        OTEL_LOGS_EXPORTER: none
+        OTEL_METRICS_EXPORTER: none
 
 Outputs:
   RuntimeArn:

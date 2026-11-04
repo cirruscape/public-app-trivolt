@@ -1,0 +1,9 @@
+{
+  "name": "quizapp-agent-image",
+  "private": true,
+  "description": "Packages installed into the agent image beside the bundle (see ../Dockerfile). @opentelemetry/api is pinned to ADOT's exact version so the bundle, Strands and ADOT share one copy of the OTel API.",
+  "dependencies": {
+    "@aws/aws-distro-opentelemetry-node-autoinstrumentation": "0.13.0",
+    "@opentelemetry/api": "1.9.1"
+  }
+}

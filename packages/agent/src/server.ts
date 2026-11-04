@@ -1,5 +1,6 @@
 // AgentCore Runtime HTTP contract: listen on 0.0.0.0:8080 (arm64 image),
 // GET /ping for health, POST /invocations with a JSON AgentRequest (PLAN §8).
+import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { AgentRequest, type AgentResponse } from '@quizapp/contracts';
 import { createBedrockGenerationModel } from './generation/bedrock-model.js';
@@ -8,6 +9,8 @@ import { modelConfigFromEnv } from './model.js';
 
 const PORT = 8080;
 const MAX_BODY_BYTES = 256 * 1024;
+/** Set by AgentCore Runtime on every invocation (Node lower-cases header names). */
+const SESSION_HEADER = 'x-amzn-bedrock-agentcore-runtime-session-id';
 
 export function createRouter(handle: (request: AgentRequest) => Promise<AgentResponse>) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -22,7 +25,7 @@ export function createRouter(handle: (request: AgentRequest) => Promise<AgentRes
         return;
       }
       try {
-        send(res, 200, await handle(parsed.data));
+        send(res, 200, await traced(req, () => handle(parsed.data)));
       } catch (err) {
         console.error('generation failed', err);
         send(res, 500, { status: 'error', error: 'GENERATION_FAILED' });
@@ -31,6 +34,37 @@ export function createRouter(handle: (request: AgentRequest) => Promise<AgentRes
     }
     send(res, 404, { error: 'NOT_FOUND' });
   };
+}
+
+/**
+ * Runs `fn` in one `invocation` span, so the writer's and checker's agent spans share a trace,
+ * with the AgentCore session ID as `session.id` baggage. ADOT copies that baggage onto every
+ * span, which is how AgentCore Observability groups traces into sessions. Without a registered
+ * OTel SDK (tests, local runs), this is a no-op wrapper.
+ */
+function traced<T>(req: IncomingMessage, fn: () => Promise<T>): Promise<T> {
+  const sessionId = req.headers[SESSION_HEADER];
+  let ctx = context.active();
+  if (typeof sessionId === 'string' && sessionId) {
+    const baggage = (propagation.getBaggage(ctx) ?? propagation.createBaggage()).setEntry(
+      'session.id',
+      { value: sessionId },
+    );
+    ctx = propagation.setBaggage(ctx, baggage);
+  }
+  return context.with(ctx, () =>
+    trace.getTracer('quizapp-agent').startActiveSpan('invocation', async (span) => {
+      try {
+        return await fn();
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR });
+        throw err;
+      } finally {
+        span.end();
+      }
+    }),
+  );
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {

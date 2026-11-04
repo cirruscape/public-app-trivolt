@@ -49,7 +49,7 @@ export function createBedrockGenerationModel(config: ModelConfig): GenerationMod
 
   return {
     async generate({ topic, difficulty, count, avoid }) {
-      const agent = new Agent({ model, systemPrompt: WRITER, printer: false });
+      const agent = new Agent({ name: 'Quiz writer', model, systemPrompt: WRITER, printer: false });
       const avoidList = avoid.length
         ? `\nDo not repeat or closely resemble any of these questions:\n${avoid.map((t) => `- ${t}`).join('\n')}`
         : '';
@@ -64,7 +64,12 @@ export function createBedrockGenerationModel(config: ModelConfig): GenerationMod
     },
 
     async verify({ topic, question }) {
-      const agent = new Agent({ model, systemPrompt: CHECKER, printer: false });
+      const agent = new Agent({
+        name: 'Fact checker',
+        model,
+        systemPrompt: CHECKER,
+        printer: false,
+      });
       const options = question.options.map((o, i) => `${i + 1}. ${o}`).join('\n');
       const result = await agent.invoke(
         `Topic: ${topic}\nQuestion: ${question.text}\nOptions:\n${options}\nMarked correct: option ${question.correctIndex + 1}`,
