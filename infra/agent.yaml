@@ -141,8 +141,9 @@ Resources:
         # X-Ray's endpoint in this Region, which lands them in the aws/spans log group (needs
         # CloudWatch Transaction Search, enabled once per account). Traces only: the runtime
         # already ships stdout to CloudWatch Logs, and AgentCore publishes its own metrics.
+        # Don't set OTEL_RESOURCE_ATTRIBUTES or OTEL_SERVICE_NAME here: the runtime injects its
+        # own (service name, aws.log.group.names), which the AgentCore dashboards index spans by.
         AGENT_OBSERVABILITY_ENABLED: 'true'
-        OTEL_RESOURCE_ATTRIBUTES: !Sub service.name=quizapp_${Env}_generator,deployment.environment=${Env}
         OTEL_LOGS_EXPORTER: none
         OTEL_METRICS_EXPORTER: none
 

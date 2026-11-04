@@ -92,4 +92,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   createServer((req, res) => void createRouter(handle)(req, res)).listen(PORT, '0.0.0.0', () =>
     console.log(`agent listening on 0.0.0.0:${PORT}`),
   );
+  // The OTel settings AgentCore Runtime injected, so tracing problems can be diagnosed from the
+  // runtime logs. Headers are left out: they can carry credentials.
+  console.log(
+    'otel config',
+    JSON.stringify({
+      OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME,
+      OTEL_RESOURCE_ATTRIBUTES: process.env.OTEL_RESOURCE_ATTRIBUTES,
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    }),
+  );
 }
