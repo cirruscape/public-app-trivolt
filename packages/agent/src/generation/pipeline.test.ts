@@ -117,6 +117,37 @@ describe('generateQuiz', () => {
   });
 });
 
+describe('generateQuiz: oversized batches', () => {
+  it('uses only as many Questions as it asked for, without verifying the extras', async () => {
+    const model = fakeModel([[candidate(1), candidate(2), candidate(3), candidate(4)]]);
+    const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
+
+    expect(result.ok && result.questions.map((q) => q.text)).toEqual([
+      'Question 1?',
+      'Question 2?',
+    ]);
+    expect(model.verify).toHaveBeenCalledTimes(2);
+    expect(result.stats).toMatchObject({ proposed: 2, returned: 2 });
+  });
+
+  it('caps each replacement round at the shortfall', async () => {
+    const model = fakeModel(
+      [
+        [candidate(1), candidate(2)],
+        [candidate(3), candidate(4), candidate(5)],
+      ],
+      ['Question 2?'],
+    );
+    const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
+
+    expect(result.ok && result.questions.map((q) => q.text)).toEqual([
+      'Question 1?',
+      'Question 3?',
+    ]);
+    expect(model.verify).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('generateQuiz: validation in code', () => {
   it.each([
     ['only one Option', { options: ['Lonely'] }],
@@ -128,7 +159,7 @@ describe('generateQuiz: validation in code', () => {
     ['empty text', { text: '   ' }],
     ['text over 300 characters', { text: `${'x'.repeat(300)}?` }],
   ])('drops a Question with %s, without spending a verification on it', async (_why, extra) => {
-    const model = fakeModel([[candidate(1, extra), candidate(2)]]);
+    const model = fakeModel([[candidate(1, extra)], [candidate(2)]]);
     const result = await generateQuiz(model, { ...request, count: 1, avoid: [] });
     expect(result.ok && result.questions.map((q) => q.text)).toEqual(['Question 2?']);
     expect(model.verify).toHaveBeenCalledTimes(1);

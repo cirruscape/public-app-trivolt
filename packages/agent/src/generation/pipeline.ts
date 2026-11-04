@@ -103,12 +103,17 @@ export async function generateQuiz(
   try {
     for (let round = 0; round < ROUNDS && kept.length < input.count; round++) {
       stats.rounds++;
-      const batch = await model.generate({
-        topic: input.topic,
-        difficulty: input.difficulty,
-        count: input.count - kept.length,
-        avoid: [...seen],
-      });
+      const wanted = input.count - kept.length;
+      // The model sometimes writes more than it was asked for. The extras are discarded unseen,
+      // so they cost no verification calls and stay out of the avoid list.
+      const batch = (
+        await model.generate({
+          topic: input.topic,
+          difficulty: input.difficulty,
+          count: wanted,
+          avoid: [...seen],
+        })
+      ).slice(0, wanted);
       stats.proposed += batch.length;
       // Drop malformed Questions and repeats before spending a verification call on them.
       const fresh = batch.filter((question) => {
