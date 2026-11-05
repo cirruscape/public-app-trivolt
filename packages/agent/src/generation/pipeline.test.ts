@@ -35,7 +35,7 @@ describe('generateQuiz', () => {
     const model = fakeModel([[candidate(1), candidate(2, { correctIndex: 2 })]]);
     const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       questions: [
         {
@@ -96,7 +96,7 @@ describe('generateQuiz', () => {
       [[candidate(1)], [candidate(2)], [candidate(3)]],
       ['Question 1?', 'Question 2?', 'Question 3?'],
     );
-    expect(await generateQuiz(model, { ...request, count: 1, avoid: [] })).toEqual({
+    expect(await generateQuiz(model, { ...request, count: 1, avoid: [] })).toMatchObject({
       ok: false,
       error: 'GENERATION_FAILED',
     });
@@ -109,10 +109,42 @@ describe('generateQuiz', () => {
       },
       verify: async () => ({ ok: true, reason: '' }),
     };
-    expect(await generateQuiz(model, { ...request, count: 5, avoid: [] })).toEqual({
+    expect(await generateQuiz(model, { ...request, count: 5, avoid: [] })).toMatchObject({
       ok: false,
       error: 'TOPIC_REFUSED',
+      stats: { requested: 5, rounds: 1, returned: 0 },
     });
+  });
+});
+
+describe('generateQuiz: oversized batches', () => {
+  it('uses only as many Questions as it asked for, without verifying the extras', async () => {
+    const model = fakeModel([[candidate(1), candidate(2), candidate(3), candidate(4)]]);
+    const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
+
+    expect(result.ok && result.questions.map((q) => q.text)).toEqual([
+      'Question 1?',
+      'Question 2?',
+    ]);
+    expect(model.verify).toHaveBeenCalledTimes(2);
+    expect(result.stats).toMatchObject({ proposed: 2, returned: 2 });
+  });
+
+  it('caps each replacement round at the shortfall', async () => {
+    const model = fakeModel(
+      [
+        [candidate(1), candidate(2)],
+        [candidate(3), candidate(4), candidate(5)],
+      ],
+      ['Question 2?'],
+    );
+    const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
+
+    expect(result.ok && result.questions.map((q) => q.text)).toEqual([
+      'Question 1?',
+      'Question 3?',
+    ]);
+    expect(model.verify).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -127,7 +159,7 @@ describe('generateQuiz: validation in code', () => {
     ['empty text', { text: '   ' }],
     ['text over 300 characters', { text: `${'x'.repeat(300)}?` }],
   ])('drops a Question with %s, without spending a verification on it', async (_why, extra) => {
-    const model = fakeModel([[candidate(1, extra), candidate(2)]]);
+    const model = fakeModel([[candidate(1, extra)], [candidate(2)]]);
     const result = await generateQuiz(model, { ...request, count: 1, avoid: [] });
     expect(result.ok && result.questions.map((q) => q.text)).toEqual(['Question 2?']);
     expect(model.verify).toHaveBeenCalledTimes(1);
@@ -147,5 +179,42 @@ describe('generateQuiz: validation in code', () => {
       avoid: ['What is the capital of France?'],
     });
     expect(result.ok && result.questions.map((q) => q.text)).toEqual(['Question 2?']);
+  });
+});
+
+describe('generateQuiz: reporting what was dropped', () => {
+  it('counts every proposed Question and says why each unused one was dropped', async () => {
+    const model = fakeModel(
+      [
+        [candidate(1), candidate(2, { options: ['Lonely'] }), candidate(3)],
+        [candidate(4, { text: 'question 1' }), candidate(5)],
+        [candidate(6)],
+      ],
+      ['Question 3?', 'Question 5?'],
+    );
+    const result = await generateQuiz(model, { ...request, count: 3, avoid: [] });
+
+    expect(result.stats).toEqual({
+      requested: 3,
+      rounds: 3,
+      proposed: 6,
+      malformed: 1,
+      duplicate: 1,
+      failedCheck: 2,
+      returned: 2,
+    });
+    expect(result.rejections).toEqual([
+      { text: 'Question 2?', kind: 'MALFORMED' },
+      { text: 'Question 3?', kind: 'FAILED_CHECK', reason: 'two Options are defensible' },
+      { text: 'question 1', kind: 'DUPLICATE' },
+      { text: 'Question 5?', kind: 'FAILED_CHECK', reason: 'two Options are defensible' },
+    ]);
+  });
+
+  it('reports nothing dropped when every Question passes first time', async () => {
+    const model = fakeModel([[candidate(1), candidate(2)]]);
+    const result = await generateQuiz(model, { ...request, count: 2, avoid: [] });
+    expect(result.rejections).toEqual([]);
+    expect(result.stats).toMatchObject({ rounds: 1, proposed: 2, returned: 2, failedCheck: 0 });
   });
 });

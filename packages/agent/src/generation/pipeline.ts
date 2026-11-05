@@ -45,9 +45,34 @@ export interface GeneratedQuestion {
   correctOptionId: string;
 }
 
-export type GenerationResult =
+/** What happened to the Questions the model proposed, for traces and metrics. */
+export interface GenerationStats {
+  requested: number;
+  /** generate calls made (1 to 3). */
+  rounds: number;
+  /** Questions proposed by the model, in every round. */
+  proposed: number;
+  /** Failed the shape rules (FR-2.3). */
+  malformed: number;
+  /** Repeated an earlier Question, or one in the avoid list. */
+  duplicate: number;
+  /** Failed the fact-checker. */
+  failedCheck: number;
+  returned: number;
+}
+
+/** One proposed Question that wasn't used, and why. */
+export interface Rejection {
+  text: string;
+  kind: 'MALFORMED' | 'DUPLICATE' | 'FAILED_CHECK';
+  /** The fact-checker's reason, for FAILED_CHECK. */
+  reason?: string;
+}
+
+export type GenerationResult = { stats: GenerationStats; rejections: Rejection[] } & (
   | { ok: true; questions: GeneratedQuestion[] }
-  | { ok: false; error: 'TOPIC_REFUSED' | 'GENERATION_FAILED' };
+  | { ok: false; error: 'TOPIC_REFUSED' | 'GENERATION_FAILED' }
+);
 
 /** The first round plus two replacement rounds (PLAN §8). */
 const ROUNDS = 3;
@@ -59,21 +84,47 @@ export async function generateQuiz(
   const kept: Candidate[] = [];
   const seen = [...input.avoid];
   const seenKeys = new Set(input.avoid.map(textKey));
+  const rejections: Rejection[] = [];
+  const stats: GenerationStats = {
+    requested: input.count,
+    rounds: 0,
+    proposed: 0,
+    malformed: 0,
+    duplicate: 0,
+    failedCheck: 0,
+    returned: 0,
+  };
+  const reject = (rejection: Rejection) => {
+    rejections.push(rejection);
+    if (rejection.kind === 'MALFORMED') stats.malformed++;
+    else if (rejection.kind === 'DUPLICATE') stats.duplicate++;
+    else stats.failedCheck++;
+  };
   try {
     for (let round = 0; round < ROUNDS && kept.length < input.count; round++) {
-      const batch = await model.generate({
-        topic: input.topic,
-        difficulty: input.difficulty,
-        count: input.count - kept.length,
-        avoid: [...seen],
-      });
+      stats.rounds++;
+      const wanted = input.count - kept.length;
+      // The model sometimes writes more than it was asked for. The extras are discarded unseen,
+      // so they cost no verification calls and stay out of the avoid list.
+      const batch = (
+        await model.generate({
+          topic: input.topic,
+          difficulty: input.difficulty,
+          count: wanted,
+          avoid: [...seen],
+        })
+      ).slice(0, wanted);
+      stats.proposed += batch.length;
       // Drop malformed Questions and repeats before spending a verification call on them.
       const fresh = batch.filter((question) => {
         const key = textKey(question.text);
-        const usable = isWellFormed(question) && !seenKeys.has(key);
+        const repeat = seenKeys.has(key);
         seenKeys.add(key);
         seen.push(question.text);
-        return usable;
+        if (!isWellFormed(question)) reject({ text: question.text, kind: 'MALFORMED' });
+        else if (repeat) reject({ text: question.text, kind: 'DUPLICATE' });
+        else return true;
+        return false;
       });
       const verdicts = await Promise.all(
         fresh.map((question) =>
@@ -81,15 +132,21 @@ export async function generateQuiz(
         ),
       );
       fresh.forEach((question, i) => {
-        if (verdicts[i]?.ok && kept.length < input.count) kept.push(question);
+        const verdict = verdicts[i];
+        if (!verdict?.ok) {
+          reject({ text: question.text, kind: 'FAILED_CHECK', reason: verdict?.reason ?? '' });
+        } else if (kept.length < input.count) kept.push(question);
       });
     }
   } catch (err) {
-    if (err instanceof ModelRefusedError) return { ok: false, error: 'TOPIC_REFUSED' };
+    if (err instanceof ModelRefusedError) {
+      return { ok: false, error: 'TOPIC_REFUSED', stats, rejections };
+    }
     throw err;
   }
-  if (kept.length === 0) return { ok: false, error: 'GENERATION_FAILED' };
-  return { ok: true, questions: kept.map(labelled) };
+  stats.returned = kept.length;
+  if (kept.length === 0) return { ok: false, error: 'GENERATION_FAILED', stats, rejections };
+  return { ok: true, questions: kept.map(labelled), stats, rejections };
 }
 
 const MAX_TEXT = 300;

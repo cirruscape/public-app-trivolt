@@ -58,11 +58,29 @@ const GeneratedQuestion = z.object({
   correctOptionId: z.string(),
 });
 
+/** What happened to the Questions the model proposed; the worker publishes it as metrics. */
+export const GenerationStats = z.object({
+  requested: z.number(),
+  rounds: z.number(),
+  proposed: z.number(),
+  malformed: z.number(),
+  duplicate: z.number(),
+  failedCheck: z.number(),
+  returned: z.number(),
+});
+export type GenerationStats = z.infer<typeof GenerationStats>;
+
 export const AgentResponse = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('success'), questions: z.array(GeneratedQuestion) }),
+  z.object({
+    status: z.literal('success'),
+    questions: z.array(GeneratedQuestion),
+    stats: GenerationStats.optional(),
+  }),
   z.object({
     status: z.literal('error'),
     error: z.enum(['TOPIC_REFUSED', 'GENERATION_FAILED', 'INVALID_REQUEST']),
+    /** Absent for INVALID_REQUEST, and from agents older than this field. */
+    stats: GenerationStats.optional(),
   }),
 ]);
 export type AgentResponse = z.infer<typeof AgentResponse>;
