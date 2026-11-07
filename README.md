@@ -1,4 +1,4 @@
-# Quiz App
+# Trivolt
 
 A live trivia game. A Host generates a Quiz with AI, reviews it, and runs a Game in real time while Players answer on their own devices. It runs on AWS serverless services in ap-southeast-2.
 
