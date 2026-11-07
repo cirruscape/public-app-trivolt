@@ -2,10 +2,16 @@
 
 A live trivia game. A Host generates a Quiz with AI, reviews it, and runs a Game in real time while Players answer on their own devices. It runs on AWS serverless services in ap-southeast-2.
 
+The blog post [Building a multiplayer quiz game with AI using AWS serverless](https://builder.aws.com/content/3AuMiRkQdjCeiZqtieVsNcrQ2Pr/building-a-multiplayer-quiz-game-with-ai-using-aws-serverless) describes how it was built.
+
+![Trivolt: deployed AWS infrastructure](./aws-infra.png)
+
 - [`GLOSSARY.md`](./GLOSSARY.md): the domain language. Code uses these terms exactly.
 - [`docs/PRD.md`](./docs/PRD.md): requirements
 - [`docs/PLAN.md`](./docs/PLAN.md): architecture and milestones
 - [`docs/adr/`](./docs/adr/): architectural decisions
+- [`grill_output/`](./grill_output/): transcripts of the AI-assisted design sessions, one per part
+- Infrastructure diagrams, one per stack (the overview is below): [foundation](./foundation-infra.png), [api](./api-infra.png), [agent](./agent-infra.png), [web](./web-infra.png)
 
 ## Layout
 
@@ -39,8 +45,8 @@ To lint the templates, you also need cfn-lint (`pip install cfn-lint`). Then run
 1. Open the app URL (the **web** job prints it, or see the `quizapp-dev-web` stack's `Url` output).
 2. **Host:** choose _Host a game_, sign up with your email, and confirm it with the code Cognito sends.
 3. Choose **New quiz**, give it a Topic, and wait about a minute while it's written and fact-checked. Review the Draft: discard or regenerate Questions, adjust Time Limits, then **Approve**. Each Host gets 20 generations a day.
-4. Start a game from a Ready Quiz. The Lobby shows a Join Code and a join link.
-5. **Players:** open the join link (or _/play_ plus the code) on phones, pick a Nickname, and play.
+4. Start a game from a Ready Quiz. The Lobby shows the Join Code, the Join Link, and a QR code of the Join Link that Players can scan from across the room.
+5. **Players:** scan the QR code or open the Join Link (or _/play_ plus the code) on phones, pick a Nickname, and play.
 
 To work on the web app locally against dev:
 
@@ -147,6 +153,13 @@ sam deploy --profile quizdash --region ap-southeast-2 \
 ```
 
 Pass the domain values from `infra/params/dev.json` on every manual deploy of the api and web stacks, so the stack never keeps stale values or drops the custom domain.
+
+### Observability
+
+- **Traces:** the agent image includes AWS Distro for OpenTelemetry (ADOT) and exports spans to AgentCore Observability (CloudWatch → GenAI Observability). Each generation is one trace, grouped by AgentCore session, with spans for the _Quiz writer_ and _Fact checker_ agents. The invocation span carries `quiz.*` counts, and each rejected Question is a `question.rejected` span event with the reason.
+- **Metrics:** the worker publishes `QuestionsRequested`, `QuestionsReturned`, `QuestionsMalformed` and `QuestionsFailedCheck` to the `QuizApp` CloudWatch namespace, per `Env`.
+
+New spans can take several minutes to appear in the Observability views.
 
 ### Seeding and the smoke test
 
