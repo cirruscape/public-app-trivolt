@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, ApiError, messageFor } from '../api.js';
-import { Countdown, ErrorNote, Leaderboard, Options, Page, QuestionHeader } from '../components.js';
+import {
+  ConfirmDialog,
+  Countdown,
+  ErrorNote,
+  Leaderboard,
+  Options,
+  Page,
+  QuestionHeader,
+} from '../components.js';
 import { useCountdown } from '../sync/use-countdown.js';
 import { useLiveSnapshot } from '../sync/use-live-snapshot.js';
 import { runningDeadline, type HostSnapshot } from '../types.js';
@@ -28,6 +36,9 @@ export function HostGame() {
   const remaining = useCountdown(s ? runningDeadline(s) : null, live.clock);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   async function command(path: string, method = 'POST') {
     setBusy(true);
@@ -40,6 +51,21 @@ export function HostGame() {
         setError(messageFor(err));
     } finally {
       setBusy(false);
+      live.refresh();
+    }
+  }
+
+  // FR-8.5: the Host ends the Game early. Players see the final Leaderboard at once.
+  async function cancelGame() {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await api('POST', `/api/games/${gameId}/cancel`, { token: await hostToken() });
+      setConfirmingCancel(false);
+    } catch (err) {
+      setCancelError(messageFor(err));
+    } finally {
+      setCancelling(false);
       live.refresh();
     }
   }
@@ -73,6 +99,39 @@ export function HostGame() {
       <Page>{live.error ? <ErrorNote message={messageFor(live.error)} /> : <p>Loading…</p>}</Page>
     );
   }
+
+  const cancelButton = (
+    <button
+      type="button"
+      className="button button--danger"
+      disabled={busy || cancelling}
+      onClick={() => {
+        setCancelError(null);
+        setConfirmingCancel(true);
+      }}
+    >
+      Cancel game
+    </button>
+  );
+
+  const cancelDialog = (
+    <ConfirmDialog
+      open={confirmingCancel && s.phase !== 'FINISHED'}
+      title="Cancel this game?"
+      confirmLabel="Cancel game"
+      busyLabel="Cancelling…"
+      busy={cancelling}
+      error={cancelError}
+      onConfirm={() => void cancelGame()}
+      onCancel={() => setConfirmingCancel(false)}
+    >
+      <p>
+        {s.phase === 'LOBBY'
+          ? 'Players who have joined will be told the game is over.'
+          : 'Players will see the final leaderboard now. The current question won’t be scored. The game is kept in Past games.'}
+      </p>
+    </ConfirmDialog>
+  );
 
   switch (s.phase) {
     case 'LOBBY': {
@@ -116,8 +175,10 @@ export function HostGame() {
               >
                 Start the game
               </button>
+              {cancelButton}
             </div>
           </div>
+          {cancelDialog}
         </Page>
       );
     }
@@ -133,6 +194,8 @@ export function HostGame() {
             {s.answered?.answered ?? 0} of {s.answered?.total ?? 0} answered
           </p>
           <ErrorNote message={error} />
+          {cancelButton}
+          {cancelDialog}
         </Page>
       );
     }
@@ -156,6 +219,8 @@ export function HostGame() {
           >
             {last ? 'Finish the game' : 'Next question'}
           </button>
+          {cancelButton}
+          {cancelDialog}
         </Page>
       );
     }

@@ -557,3 +557,38 @@ describe('the abandonment sweeper (FR-8.4)', () => {
     expect((await h.repo.getGame(h.gameId))?.game.phase).toBe('REVEAL');
   });
 });
+
+describe('the Host cancelling a Game (FR-8.5)', () => {
+  it('finishes it at once, recording it as abandoned and freeing the Host to start another', async () => {
+    const h = await startedGame('Alice');
+    h.clock.now = T0 + 5_000;
+    h.published.length = 0;
+
+    const cancelled = await h.service.hostCommand(HOST, h.gameId, { type: 'Cancel' });
+    expect(cancelled.ok && cancelled.value.phase).toBe('FINISHED');
+
+    const record = await h.service.getHistory(HOST, h.gameId);
+    expect(record.ok && record.value.abandoned).toBe(true);
+    expect(record.ok && record.value.finishedAt).toBe(T0 + 5_000);
+    expect(await h.repo.getActiveGameId(HOST)).toBeNull();
+    expect(await h.repo.findGameIdByJoinCode(h.joinCode)).toBeNull();
+    expect(h.published).toContainEqual(
+      expect.objectContaining({
+        channel: `/game/${h.gameId}/players`,
+        event: expect.objectContaining({
+          type: 'GAME_FINISHED',
+          payload: expect.objectContaining({ abandoned: true }),
+        }),
+      }),
+    );
+  });
+
+  it("refuses to cancel another Host's Game", async () => {
+    const h = await startedGame('Alice');
+    expect(await h.service.hostCommand('intruder', h.gameId, { type: 'Cancel' })).toEqual({
+      ok: false,
+      error: 'NOT_YOUR_GAME',
+    });
+    expect((await h.repo.getGame(h.gameId))?.game.phase).toBe('QUESTION_OPEN');
+  });
+});

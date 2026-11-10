@@ -55,7 +55,9 @@ export type GameCommand =
   | { type: 'Close' }
   | { type: 'Next' }
   | { type: 'RemovePlayer'; playerId: string }
-  | { type: 'Abandon' };
+  | { type: 'Abandon' }
+  /** The Host ends the Game early, from any phase but Finished. */
+  | { type: 'Cancel' };
 
 export type GameEvent =
   | { type: 'PLAYER_JOINED'; playerId: string; nickname: string; playerCount: number }
@@ -158,6 +160,7 @@ const ALLOWED_PHASES: Record<Exclude<GameCommand['type'], 'Join'>, Phase[]> = {
   Next: ['REVEAL'],
   RemovePlayer: ['LOBBY', 'QUESTION_OPEN', 'REVEAL'],
   Abandon: ['LOBBY', 'QUESTION_OPEN', 'REVEAL'],
+  Cancel: ['LOBBY', 'QUESTION_OPEN', 'REVEAL'],
 };
 
 export function decide(game: Game, command: GameCommand, now: Instant): Decision {
@@ -177,6 +180,9 @@ export function decide(game: Game, command: GameCommand, now: Instant): Decision
       return openQuestion(game, game.questionIndex + 1, now);
     case 'Abandon':
       if (now - game.lastActivityAt < ABANDON_AFTER_MS) return { ok: false, error: 'NOT_IDLE' };
+      return finish(game, now, true);
+    case 'Cancel':
+      // Finishes just as abandonment does, without waiting for the Game to go idle (FR-8.5).
       return finish(game, now, true);
     case 'RemovePlayer':
       return removePlayer(game, command.playerId, now);
