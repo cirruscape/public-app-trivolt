@@ -259,6 +259,50 @@ describe('reviewing a Draft', () => {
     expect(await service.getQuiz(HOST, quizId)).toEqual({ ok: false, error: 'QUIZ_NOT_FOUND' });
   });
 
+  it('deletes a Quiz in any status', async () => {
+    const h = harness();
+    await h.repo.putQuiz(HOST, sampleQuiz('ready'));
+    await h.repo.putQuiz(HOST, {
+      ...sampleQuiz('failed'),
+      status: 'FAILED',
+      questions: [],
+      failureReason: 'GENERATION_FAILED',
+    });
+    const generating = await h.service.createQuiz(HOST, request);
+    if (!generating.ok) throw new Error(generating.error);
+    const ids = ['ready', 'failed', generating.value.quizId];
+
+    for (const quizId of ids) expect((await h.service.deleteQuiz(HOST, quizId)).ok).toBe(true);
+    expect(await h.service.listQuizzes(HOST)).toEqual({ ok: true, value: [] });
+  });
+
+  it('keeps a Quiz deleted while it is generating deleted', async () => {
+    const h = harness();
+    const created = await h.service.createQuiz(HOST, request);
+    if (!created.ok) throw new Error(created.error);
+    await h.service.deleteQuiz(HOST, created.value.quizId);
+
+    expect(await h.service.runJob(h.jobs[0]!)).toBe('SKIPPED');
+    expect(await h.repo.getQuiz(HOST, created.value.quizId)).toBeNull();
+  });
+
+  it('keeps a Quiz deleted while the agent is writing it deleted', async () => {
+    let quizId = '';
+    const h = harness({
+      agent: async () => {
+        await service.deleteQuiz(HOST, quizId);
+        return { status: 'success', questions: generated(5) };
+      },
+    });
+    const service = h.service;
+    const created = await service.createQuiz(HOST, request);
+    if (!created.ok) throw new Error(created.error);
+    quizId = created.value.quizId;
+
+    await service.runJob(h.jobs[0]!);
+    expect(await h.repo.getQuiz(HOST, quizId)).toBeNull();
+  });
+
   it("keeps every operation to the Quiz's own Host", async () => {
     const { service, quizId, questionIds } = await withDraft();
     const notFound = { ok: false, error: 'QUIZ_NOT_FOUND' };

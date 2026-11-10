@@ -44,7 +44,7 @@ To lint the templates, you also need cfn-lint (`pip install cfn-lint`). Then run
 
 1. Open the app URL (the **web** job prints it, or see the `quizapp-dev-web` stack's `Url` output).
 2. **Host:** choose _Host a game_, sign up with your email, and confirm it with the code Cognito sends. Host sign-up and sign-in work only from New Zealand (see [Host sign-in firewall](#host-sign-in-firewall)).
-3. Choose **New quiz**, give it a Topic, and wait about a minute while it's written and fact-checked. Review the Draft: discard or regenerate Questions, adjust Time Limits, then **Approve**. Each Host gets 20 generations a day.
+3. Choose **New quiz**, give it a Topic, and wait about a minute while it's written and fact-checked. Review the Draft: discard or regenerate Questions, adjust Time Limits, then **Approve**. Each Host gets 20 generations a day. Choose **Delete** on any Quiz in the list to remove it, whatever its status. Past games are kept.
 4. Start a game from a Ready Quiz. The Lobby shows the Join Code, the Join Link, and a QR code of the Join Link that Players can scan from across the room.
 5. **Players:** scan the QR code or open the Join Link (or _/play_ plus the code) on phones, pick a Nickname, and play.
 

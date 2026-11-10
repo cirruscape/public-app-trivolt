@@ -528,6 +528,16 @@ label {
   color: var(--accent-text);
 }
 
+.button--danger {
+  color: var(--wrong);
+}
+
+.button--destructive {
+  background: var(--wrong);
+  border-color: var(--wrong);
+  color: #ffffff;
+}
+
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -588,6 +598,12 @@ label {
 
 .card__title {
   margin: 0;
+}
+
+.card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .card--link {
@@ -940,4 +956,58 @@ button.option:active:not(:disabled) {
   --amplify-colors-brand-primary-100: var(--accent);
   --amplify-components-authenticator-router-border-color: var(--border);
   padding: 2rem 1rem;
+}
+
+/* A modal confirmation (ConfirmDialog), on the native <dialog> element. */
+.dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--brand-shadow);
+}
+
+.dialog::backdrop {
+  background: rgba(20, 20, 18, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.dialog[open] {
+  animation: dialog-in 140ms ease-out;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] {
+    animation: none;
+  }
+}
+
+.dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.dialog__body {
+  color: var(--muted);
+}
+
+.dialog__body p {
+  margin: 0 0 1.25rem;
+}
+
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
