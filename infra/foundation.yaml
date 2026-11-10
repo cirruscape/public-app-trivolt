@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::LanguageExtensions
 Description: >-
-  Quiz App foundation (PLAN §9): DynamoDB table, Cognito user pool for Hosts,
+  Quiz App foundation (PLAN §9): DynamoDB table, Cognito user pool for Hosts and
+  its WAF web ACL,
   ECR repository for the generation agent, Player token signing secret and
   runtime parameters. Stack name: quizapp-{env}-foundation.
 
@@ -90,6 +91,125 @@ Resources:
         AccessToken: hours
         IdToken: hours
         RefreshToken: days
+
+  # ---------------------------------------------------------------- Host auth firewall
+  # Filters the user pool's public endpoints (sign-up, confirmation, SRP sign-in, password
+  # reset): New Zealand only, plus AWS managed protections. Cognito doesn't send IAM-signed
+  # Admin* calls (the smoke test and seed scripts) through WAF, so CI runners outside NZ still
+  # work. Players never touch Cognito, so joining a Game isn't affected.
+  UserPoolWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub quizapp-${Env}-hosts
+      Description: Host sign-up and sign-in from New Zealand only, with AWS managed protections.
+      Scope: REGIONAL
+      DefaultAction: { Allow: {} }
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub quizapp-${Env}-hosts
+      Rules:
+        - Name: AllowNewZealandOnly
+          Priority: 0
+          Action: { Block: {} }
+          Statement:
+            NotStatement:
+              Statement:
+                GeoMatchStatement:
+                  CountryCodes: [NZ]
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AllowNewZealandOnly
+        # Botnets, scanners and other known-malicious IPs.
+        - Name: AmazonIpReputationList
+          Priority: 1
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AmazonIpReputationList
+        # VPNs, Tor exit nodes, proxies and hosting providers, which could also be used to
+        # appear to be in NZ.
+        - Name: AnonymousIpList
+          Priority: 2
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAnonymousIpList
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AnonymousIpList
+        # Slows credential stuffing and sign-up abuse. A real Host makes a handful of calls to
+        # sign up and sign in.
+        - Name: RateLimitPerIp
+          Priority: 3
+          Action: { Block: {} }
+          Statement:
+            RateBasedStatement:
+              Limit: 100
+              EvaluationWindowSec: 300
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitPerIp
+        - Name: KnownBadInputs
+          Priority: 4
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: KnownBadInputs
+        - Name: CommonRuleSet
+          Priority: 5
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: CommonRuleSet
+
+  UserPoolWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !GetAtt UserPool.Arn
+      WebACLArn: !GetAtt UserPoolWebAcl.Arn
+
+  # WAF requires the aws-waf-logs- prefix. Only blocked requests are logged.
+  UserPoolWebAclLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub aws-waf-logs-quizapp-${Env}-hosts
+      RetentionInDays: 30
+
+  UserPoolWebAclLogging:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt UserPoolWebAcl.Arn
+      # The log group ARN without the trailing :* that GetAtt returns.
+      LogDestinationConfigs:
+        - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UserPoolWebAclLogGroup}
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Requirement: MEETS_ANY
+            Conditions:
+              - ActionCondition: { Action: BLOCK }
 
   # ---------------------------------------------------------------- Agent image
   AgentRepository:

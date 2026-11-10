@@ -3,6 +3,15 @@
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { Amplify } from 'aws-amplify';
+import {
+  confirmResetPassword,
+  confirmSignIn,
+  confirmSignUp,
+  resendSignUpCode,
+  resetPassword,
+  signIn,
+  signUp,
+} from 'aws-amplify/auth';
 import { Route, Routes } from 'react-router';
 import { appConfig } from '../config.js';
 import { HostGame } from './HostGame.js';
@@ -10,14 +19,26 @@ import { HostHistoryDetail, HostHistoryList } from './HostHistory.js';
 import { HostHome } from './HostHome.js';
 import { NewQuiz } from './NewQuiz.js';
 import { QuizPage } from './QuizPage.js';
+import { withWafBlockMessage } from './waf-block.js';
 
 // Configured here, not in main.tsx, so Amplify stays out of the Players' bundle.
 const { userPoolId, userPoolClientId } = appConfig();
 Amplify.configure({ Auth: { Cognito: { userPoolId, userPoolClientId } } });
 
+// Every Cognito call the Authenticator makes, so a WAF block shows the request-access message.
+const services = {
+  handleSignIn: withWafBlockMessage(signIn),
+  handleSignUp: withWafBlockMessage(signUp),
+  handleConfirmSignIn: withWafBlockMessage(confirmSignIn),
+  handleConfirmSignUp: withWafBlockMessage(confirmSignUp),
+  handleResendSignUpCode: withWafBlockMessage(resendSignUpCode),
+  handleForgotPassword: withWafBlockMessage(resetPassword),
+  handleForgotPasswordSubmit: withWafBlockMessage(confirmResetPassword),
+};
+
 export function HostApp() {
   return (
-    <Authenticator loginMechanisms={['email']} signUpAttributes={['email']}>
+    <Authenticator loginMechanisms={['email']} signUpAttributes={['email']} services={services}>
       {({ signOut, user }) => (
         <>
           <nav className="hostbar">

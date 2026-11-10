@@ -43,7 +43,7 @@ To lint the templates, you also need cfn-lint (`pip install cfn-lint`). Then run
 ## Using the app (dev)
 
 1. Open the app URL (the **web** job prints it, or see the `quizapp-dev-web` stack's `Url` output).
-2. **Host:** choose _Host a game_, sign up with your email, and confirm it with the code Cognito sends.
+2. **Host:** choose _Host a game_, sign up with your email, and confirm it with the code Cognito sends. Host sign-up and sign-in work only from New Zealand (see [Host sign-in firewall](#host-sign-in-firewall)).
 3. Choose **New quiz**, give it a Topic, and wait about a minute while it's written and fact-checked. Review the Draft: discard or regenerate Questions, adjust Time Limits, then **Approve**. Each Host gets 20 generations a day.
 4. Start a game from a Ready Quiz. The Lobby shows the Join Code, the Join Link, and a QR code of the Join Link that Players can scan from across the room.
 5. **Players:** scan the QR code or open the Join Link (or _/play_ plus the code) on phones, pick a Nickname, and play.
@@ -160,6 +160,17 @@ Pass the domain values from `infra/params/dev.json` on every manual deploy of th
 - **Metrics:** the worker publishes `QuestionsRequested`, `QuestionsReturned`, `QuestionsMalformed` and `QuestionsFailedCheck` to the `QuizApp` CloudWatch namespace, per `Env`.
 
 New spans can take several minutes to appear in the Observability views.
+
+### Host sign-in firewall
+
+A WAF web ACL, `quizapp-{env}-hosts` in the foundation stack, filters the Cognito user pool's public endpoints: sign-up, confirmation, sign-in and password reset. It blocks:
+
+- requests from outside New Zealand
+- IPs on AWS's reputation and anonymous-IP lists (botnets, VPNs, Tor, proxies and hosting providers)
+- more than 100 requests from one IP in 5 minutes
+- known bad inputs and common exploits (the AWS core rule set)
+
+A blocked Host sees an "Unauthorised" message asking them to email support@cirruscape.com to request access. Blocked requests are logged to the `aws-waf-logs-quizapp-{env}-hosts` log group, kept for 30 days. IAM-signed Admin API calls bypass WAF, so `seed` and `smoke` work from anywhere. Players don't use Cognito, so joining a Game works from anywhere.
 
 ### Seeding and the smoke test
 
