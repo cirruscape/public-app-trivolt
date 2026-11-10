@@ -145,6 +145,9 @@ This is a learning project for a small number of users. It will be built entirel
     Lobby --> Finished: abandoned 24h
     QuestionOpen --> Finished: abandoned 24h
     Reveal --> Finished: abandoned 24h
+    Lobby --> Finished: Host cancels
+    QuestionOpen --> Finished: Host cancels
+    Reveal --> Finished: Host cancels
   ```
 
 - **FR-6.2** Questions are played in the Quiz's fixed order.
@@ -190,6 +193,7 @@ This is a learning project for a small number of users. It will be built entirel
   - While the Host is away, the Game simply waits: no Question closes or advances without them.
   - If a Question's deadline passes while the Host is away, Answers are already rejected by the deadline (FR-6.4). The Question moves to Reveal as soon as the Host resumes.
 - **FR-8.4** **Abandonment.** A Game with no activity for 24 hours is automatically Finished. Its partial Leaderboard is recorded in history. Answers to a Question that was still open aren't scored, so the partial Leaderboard reflects revealed Questions only.
+- **FR-8.5** **Cancelling.** The Host can cancel their Game at any time before it's Finished, after confirming. It's Finished at once, exactly as if abandoned (FR-8.4): Players see the partial Leaderboard, the open Question isn't scored, and the Game is recorded in history as abandoned. The Host can then start another Game.
 
 ### 5.9 Game history
 

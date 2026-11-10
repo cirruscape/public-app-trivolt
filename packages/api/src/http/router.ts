@@ -57,6 +57,7 @@ const HOST_COMMANDS: Record<string, HostCommand> = {
   start: { type: 'Start' },
   close: { type: 'Close' },
   next: { type: 'Next' },
+  cancel: { type: 'Cancel' },
 };
 
 /** A command's reply: just the phase the Game is now in; details arrive as events. */
@@ -202,7 +203,7 @@ const ROUTES: Route[] = [
   },
   {
     method: 'POST',
-    pattern: new RegExp(`^/api/games/(?<gameId>${ID})/(?<command>start|close|next)$`),
+    pattern: new RegExp(`^/api/games/(?<gameId>${ID})/(?<command>start|close|next|cancel)$`),
     auth: 'host',
     handle: async ({ params, deps, hostId }) => {
       const command = HOST_COMMANDS[params.command as string] as HostCommand;

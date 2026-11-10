@@ -170,6 +170,11 @@ describe('driving a Game over HTTP', () => {
     expect([tooEarly.statusCode, json(tooEarly)]).toEqual([409, { error: 'DEADLINE_NOT_REACHED' }]);
     const wrongPhase = await asHost('POST', `/api/games/${gameId}/next`);
     expect([wrongPhase.statusCode, json(wrongPhase)]).toEqual([409, { error: 'WRONG_PHASE' }]);
+
+    const cancelled = await asHost('POST', `/api/games/${gameId}/cancel`);
+    expect([cancelled.statusCode, json(cancelled)]).toEqual([200, { phase: 'FINISHED' }]);
+    const again = await asHost('POST', `/api/games/${gameId}/cancel`);
+    expect([again.statusCode, json(again)]).toEqual([409, { error: 'WRONG_PHASE' }]);
   });
 });
 

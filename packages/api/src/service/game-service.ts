@@ -43,7 +43,11 @@ export type ServiceError = string;
 /** Commands only the Game's Host may send. */
 export type HostCommand = Extract<
   GameCommand,
-  { type: 'Start' } | { type: 'Close' } | { type: 'Next' } | { type: 'RemovePlayer' }
+  | { type: 'Start' }
+  | { type: 'Close' }
+  | { type: 'Next' }
+  | { type: 'RemovePlayer' }
+  | { type: 'Cancel' }
 >;
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: ServiceError };
@@ -132,7 +136,8 @@ export function createGameService(deps: ServiceDeps): GameService {
       if (decision.game.phase === 'FINISHED' && stored.game.phase !== 'FINISHED') {
         // Record it in History (FR-9.1), then free its Join Code and its Host's active-Game slot
         // (FR-4.2, FR-4.3).
-        const abandoned = command.type === 'Abandon';
+        // Ended early, by the sweeper (FR-8.4) or the Host (FR-8.5).
+        const abandoned = command.type === 'Abandon' || command.type === 'Cancel';
         await repo.putHistory(historyRecord(decision.game, at, abandoned));
         await repo.releaseJoinCode(decision.game.joinCode);
         await repo.releaseActiveGame(decision.game.hostId, gameId);

@@ -57,7 +57,7 @@ The phase of a Game after a Question closes, when the correct Option and updated
 _Avoid_: Results, answer screen, intermission
 
 **Finished**:
-The final phase of a Game, reached after the last Reveal or when the Game is abandoned; its final Leaderboard is kept in the Host's history.
+The final phase of a Game, reached after the last Reveal, when the Host cancels the Game, or when it's abandoned; its final Leaderboard is kept in the Host's history.
 _Avoid_: Ended, complete, over, closed
 
 **Join Code**:

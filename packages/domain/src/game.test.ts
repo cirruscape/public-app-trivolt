@@ -315,6 +315,50 @@ describe('decide: abandonment', () => {
   });
 });
 
+describe('decide: the Host cancels a Game', () => {
+  it('finishes the Game at once from the Lobby', () => {
+    const lobby = ok(newGame(), join('p1')).game;
+    const d = ok(lobby, { type: 'Cancel' }, T0 + 1_000);
+    expect(d.game.phase).toBe('FINISHED');
+    expect(d.game.lastActivityAt).toBe(T0 + 1_000);
+    expect(d.events).toEqual([
+      {
+        type: 'GAME_FINISHED',
+        abandoned: true,
+        leaderboard: [{ playerId: 'p1', nickname: 'p1', score: 0, rank: 1 }],
+      },
+    ]);
+  });
+
+  it('leaves the open Question unscored, like abandonment', () => {
+    const open = ok(openGame('p1', 'p2'), answer('p1', 'a'), T0 + 1_000).game;
+    const d = ok(open, { type: 'Cancel' }, T0 + 2_000);
+    expect(d.game.phase).toBe('FINISHED');
+    expect(d.events[0]).toMatchObject({
+      type: 'GAME_FINISHED',
+      abandoned: true,
+      leaderboard: [
+        { playerId: 'p1', score: 0 },
+        { playerId: 'p2', score: 0 },
+      ],
+    });
+  });
+
+  it('keeps the Scores of revealed Questions', () => {
+    const revealed = ok(openGame('p1'), answer('p1', 'a'), T0 + 1_000).game; // p1: 975
+    const d = ok(revealed, { type: 'Cancel' }, T0 + 2_000);
+    expect(d.events[0]).toMatchObject({
+      leaderboard: [{ playerId: 'p1', nickname: 'p1', score: 975, rank: 1 }],
+    });
+  });
+
+  it('refuses to cancel a Game that is already Finished', () => {
+    const lobby = ok(newGame(), join('p1')).game;
+    const finished = ok(lobby, { type: 'Cancel' }).game;
+    expect(decide(finished, { type: 'Cancel' }, T0)).toEqual({ ok: false, error: 'WRONG_PHASE' });
+  });
+});
+
 describe('decide: commands in the wrong phase', () => {
   const lobby = () => ok(newGame(), join('p1')).game;
   const open = () => openGame('p1', 'p2');
