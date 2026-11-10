@@ -1,11 +1,12 @@
 // The Host's home: resume an unfinished Game from any device (FR-8.3), generate a Quiz, review
-// Drafts, or start a Game from a Ready Quiz (FR-4.1).
+// Drafts, start a Game from a Ready Quiz (FR-4.1), or delete a Quiz in any status.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, messageFor } from '../api.js';
-import { ErrorNote, Page } from '../components.js';
+import { ConfirmDialog, ErrorNote, Page } from '../components.js';
 import type { QuizSummary } from '../types.js';
 import { hostToken } from './auth.js';
+import { deleteConfirmation } from './delete-quiz.js';
 
 const STATUS_LABEL: Record<QuizSummary['status'], string> = {
   GENERATING: 'Generating…',
@@ -20,6 +21,9 @@ export function HostHome() {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<QuizSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -51,6 +55,27 @@ export function HostHome() {
       setStarting(null);
     }
   }
+
+  function askToDelete(quiz: QuizSummary) {
+    setDeleteError(null);
+    setToDelete(quiz);
+  }
+
+  async function deleteQuiz(quiz: QuizSummary) {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api('DELETE', `/api/quizzes/${quiz.quizId}`, { token: await hostToken() });
+      setQuizzes((list) => list?.filter((q) => q.quizId !== quiz.quizId) ?? null);
+      setToDelete(null);
+    } catch (err) {
+      setDeleteError(messageFor(err));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const confirmation = toDelete && deleteConfirmation(toDelete);
 
   return (
     <Page title="Your quizzes">
@@ -92,24 +117,47 @@ export function HostHome() {
                       : 'Generation failed.')}
                 </p>
               </div>
-              {q.status === 'READY' ? (
+              <div className="card__actions">
+                {q.status === 'READY' ? (
+                  <button
+                    type="button"
+                    className="button button--primary"
+                    disabled={activeGameId !== null || starting !== null}
+                    onClick={() => void startGame(q.quizId)}
+                  >
+                    {starting === q.quizId ? 'Starting…' : 'Start a game'}
+                  </button>
+                ) : (
+                  <Link className="button" to={`/host/quizzes/${q.quizId}`}>
+                    {q.status === 'DRAFT' ? 'Review' : 'Open'}
+                  </Link>
+                )}
                 <button
                   type="button"
-                  className="button button--primary"
-                  disabled={activeGameId !== null || starting !== null}
-                  onClick={() => void startGame(q.quizId)}
+                  className="button button--danger"
+                  aria-label={`Delete ${q.topic ?? 'quiz'}`}
+                  disabled={starting !== null}
+                  onClick={() => askToDelete(q)}
                 >
-                  {starting === q.quizId ? 'Starting…' : 'Start a game'}
+                  Delete
                 </button>
-              ) : (
-                <Link className="button" to={`/host/quizzes/${q.quizId}`}>
-                  {q.status === 'DRAFT' ? 'Review' : 'Open'}
-                </Link>
-              )}
+              </div>
             </li>
           ))}
         </ul>
       )}
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={confirmation?.title ?? ''}
+        confirmLabel="Delete quiz"
+        busyLabel="Deleting…"
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => toDelete && void deleteQuiz(toDelete)}
+        onCancel={() => setToDelete(null)}
+      >
+        <p>{confirmation?.body}</p>
+      </ConfirmDialog>
     </Page>
   );
 }

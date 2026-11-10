@@ -1,5 +1,5 @@
 // Small shared pieces of the Host and Player screens.
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { LeaderboardEntry, Option } from './types.js';
 
 export function Page({
@@ -122,4 +122,78 @@ export function ErrorNote({ message }: { message: string | null }) {
       {message}
     </p>
   ) : null;
+}
+
+/**
+ * A modal confirmation for a destructive action, on the native <dialog> element (focus trap,
+ * Esc and the backdrop come with it). Cancel has the focus, so Enter doesn't destroy anything.
+ * Stays open while `busy`, and shows `error` if the action fails.
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  children,
+  confirmLabel,
+  busyLabel,
+  busy = false,
+  error = null,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  busyLabel: string;
+  busy?: boolean;
+  error?: string | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  function cancel() {
+    if (!busy) onCancel();
+  }
+
+  return (
+    <dialog
+      ref={ref}
+      className="dialog"
+      aria-labelledby="dialog-title"
+      onCancel={(e) => {
+        e.preventDefault(); // Esc: close through state, so React stays in charge.
+        cancel();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) cancel(); // A click on the backdrop.
+      }}
+    >
+      <h2 id="dialog-title" className="dialog__title">
+        {title}
+      </h2>
+      <div className="dialog__body">{children}</div>
+      <ErrorNote message={error} />
+      <div className="dialog__actions">
+        <button type="button" className="button" autoFocus disabled={busy} onClick={cancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="button button--destructive"
+          disabled={busy}
+          onClick={onConfirm}
+        >
+          {busy ? busyLabel : confirmLabel}
+        </button>
+      </div>
+    </dialog>
+  );
 }
